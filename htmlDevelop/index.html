@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://lf26-cdn-tos.bytecdntp.com">
+    <link rel="preconnect" href="https://cdn.dingxiang-inc.com">
+    <link rel="preconnect" href="https://proxy-api.dingxiang-inc.com/">
+    <link rel="preconnect" href="https://constid.dingxiang-inc.com/">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0284c7" />
+    <script src="https://cdn.dingxiang-inc.com/ctu-group/captcha-ui/index.js"
+        crossorigin="anonymous"></script>
+    <link rel="icon" href="data:;base64,=">
+    <title>课程表查询</title>
+    <link rel="preload" href="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/font-awesome/5.15.2/css/all.min.css"
+        as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="prefetch" as="font" crossorigin="anonymous"
+        href="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/font-awesome/5.15.2/webfonts/fa-solid-900.woff2">
+    <style>
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+    </style>
+    <style>
+/*! tailwindcss v3.0.23 | MIT License | https://tailwindcss.com*/*,:after,:before{box-sizing:border-box;border:0 solid #e5e7eb}:after,:before{--tw-content:""}html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;-o-tab-size:4;tab-size:4;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:initial}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-size:100%;line-height:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}[type=button],[type=reset],[type=submit],button{-webkit-appearance:button;background-color:initial;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:initial}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0}fieldset,legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}textarea{resize:vertical}input::-moz-placeholder,textarea::-moz-placeholder{opacity:1;color:#9ca3af}input:-ms-input-placeholder,textarea:-ms-input-placeholder{opacity:1;color:#9ca3af}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]{display:none}*,:after,:before{--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:#3b82f680;--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: }.container{width:100%}@media (min-width:640px){.container{max-width:640px}}@media (min-width:768px){.container{max-width:768px}}@media (min-width:1024px){.container{max-width:1024px}}@media (min-width:1280px){.container{max-width:1280px}}@media (min-width:1536px){.container{max-width:1536px}}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.inset-0{top:0;right:0;bottom:0;left:0}.top-0{top:0}.bottom-0{bottom:0}.z-10{z-index:10}.order-2{order:2}.mx-auto{margin-left:auto;margin-right:auto}.ml-3{margin-left:.75rem}.-mr-1{margin-right:-.25rem}.mb-6{margin-bottom:1.5rem}.mb-0{margin-bottom:0}.mb-5{margin-bottom:1.25rem}.mb-3{margin-bottom:.75rem}.mb-2{margin-bottom:.5rem}.mt-6{margin-top:1.5rem}.ml-1{margin-left:.25rem}.ml-2{margin-left:.5rem}.mr-1{margin-right:.25rem}.mb-1{margin-bottom:.25rem}.mt-4{margin-top:1rem}.mb-4{margin-bottom:1rem}.block{display:block}.inline{display:inline}.flex{display:flex}.inline-flex{display:inline-flex}.hidden{display:none}.h-16{height:4rem}.h-6{height:1.5rem}.h-full{height:100%}.h-\[40px\]{height:40px}.h-5{height:1.25rem}.w-full{width:100%}.w-0{width:0}.w-6{width:1.5rem}.w-5{width:1.25rem}.w-1\/2{width:50%}.min-w-0{min-width:0}.max-w-7xl{max-width:80rem}.flex-1{flex:1 1 0%}.flex-auto{flex:1 1 auto}.flex-shrink-0{flex-shrink:0}.cursor-pointer{cursor:pointer}.list-none{list-style-type:none}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.content-center{align-content:center}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.overflow-y-auto{overflow-y:auto}.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.break-words{overflow-wrap:break-word}.rounded-lg{border-radius:.5rem}.rounded-md{border-radius:.375rem}.rounded{border-radius:.25rem}.rounded-t{border-top-left-radius:.25rem;border-top-right-radius:.25rem}.border-0{border-width:0}.border-gray-700{--tw-border-opacity:1;border-color:rgb(55 65 81/var(--tw-border-opacity))}.bg-gray-800{--tw-bg-opacity:1;background-color:rgb(31 41 55/var(--tw-bg-opacity))}.bg-gray-900{--tw-bg-opacity:1;background-color:rgb(17 24 39/var(--tw-bg-opacity))}.bg-gray-300{--tw-bg-opacity:1;background-color:rgb(209 213 219/var(--tw-bg-opacity))}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity))}.p-2{padding:.5rem}.py-3{padding-top:.75rem;padding-bottom:.75rem}.px-3{padding-left:.75rem;padding-right:.75rem}.px-4{padding-left:1rem;padding-right:1rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.py-6{padding-top:1.5rem;padding-bottom:1.5rem}.py-1{padding-top:.25rem;padding-bottom:.25rem}.pb-6{padding-bottom:1.5rem}.pb-10{padding-bottom:2.5rem}.text-center{text-align:center}.text-right{text-align:right}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-xs{font-size:.75rem;line-height:1rem}.text-sm{font-size:.875rem;line-height:1.25rem}.font-medium{font-weight:500}.font-bold{font-weight:700}.font-semibold{font-weight:600}.uppercase{text-transform:uppercase}.text-gray-800{--tw-text-opacity:1;color:rgb(31 41 55/var(--tw-text-opacity))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity))}.text-gray-600{--tw-text-opacity:1;color:rgb(75 85 99/var(--tw-text-opacity))}.text-gray-700{--tw-text-opacity:1;color:rgb(55 65 81/var(--tw-text-opacity))}.text-gray-400{--tw-text-opacity:1;color:rgb(156 163 175/var(--tw-text-opacity))}.text-rose-500{--tw-text-opacity:1;color:rgb(244 63 94/var(--tw-text-opacity))}.antialiased{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}.placeholder-gray-400::-moz-placeholder{--tw-placeholder-opacity:1;color:rgb(156 163 175/var(--tw-placeholder-opacity))}.placeholder-gray-400:-ms-input-placeholder{--tw-placeholder-opacity:1;color:rgb(156 163 175/var(--tw-placeholder-opacity))}.placeholder-gray-400::placeholder{--tw-placeholder-opacity:1;color:rgb(156 163 175/var(--tw-placeholder-opacity))}.opacity-95{opacity:.95}.opacity-10{opacity:.1}.shadow-lg{--tw-shadow:0 10px 15px -3px #0000001a,0 4px 6px -4px #0000001a;--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color),0 4px 6px -4px var(--tw-shadow-color)}.shadow,.shadow-lg{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow{--tw-shadow:0 1px 3px 0 #0000001a,0 1px 2px -1px #0000001a;--tw-shadow-colored:0 1px 3px 0 var(--tw-shadow-color),0 1px 2px -1px var(--tw-shadow-color)}.outline-none{outline:2px solid #0000;outline-offset:2px}.transition{transition-property:color,background-color,border-color,fill,stroke,opacity,box-shadow,transform,filter,-webkit-text-decoration-color,-webkit-backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter,-webkit-text-decoration-color,-webkit-backdrop-filter;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.hover\:bg-gray-500:hover{--tw-bg-opacity:1;background-color:rgb(107 114 128/var(--tw-bg-opacity))}.hover\:text-gray-400:hover{--tw-text-opacity:1;color:rgb(156 163 175/var(--tw-text-opacity))}.hover\:shadow-lg:hover{--tw-shadow:0 10px 15px -3px #0000001a,0 4px 6px -4px #0000001a;--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color),0 4px 6px -4px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.focus\:outline-none:focus{outline:2px solid #0000;outline-offset:2px}.focus\:ring-2:focus{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color)}.focus\:ring-2:focus,.focus\:ring:focus{box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow,0 0 #0000)}.focus\:ring:focus{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color)}.focus\:ring-white:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(255 255 255/var(--tw-ring-opacity))}.active\:bg-gray-700:active{--tw-bg-opacity:1;background-color:rgb(55 65 81/var(--tw-bg-opacity))}@media (min-width:640px){.sm\:order-3{order:3}.sm\:ml-3{margin-left:.75rem}.sm\:-mr-2{margin-right:-.5rem}.sm\:block{display:block}.sm\:px-6{padding-left:1.5rem;padding-right:1.5rem}}@media (min-width:768px){.md\:w-4\/12{width:33.333333%}.md\:w-8\/12{width:66.666667%}.md\:justify-end{justify-content:flex-end}.md\:justify-between{justify-content:space-between}}@media (min-width:1024px){.lg\:w-4\/12{width:33.333333%}.lg\:px-8{padding-left:2rem;padding-right:2rem}.lg\:px-10{padding-left:2.5rem;padding-right:2.5rem}}
+    </style>
+</head>
+
+<body class="text-gray-800 antialiased">
+    <div id="dialog" class="fixed z-10 inset-0 overflow-y-auto bg-gray-800 w-full h-16 hidden">
+        <div class="max-w-7xl mx-auto py-3 px-3 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between flex-wrap">
+                <div class="w-0 flex-1 flex items-center">
+                    <span class="flex p-2 rounded-lg bg-gray-900">
+                        <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                        </svg>
+                    </span>
+                    <p class="ml-3 font-medium text-white truncate">
+                        <span id="message" class="inline"> </span>
+                    </p>
+                </div>
+                <div class="order-2 flex-shrink-0 sm:order-3 sm:ml-3">
+                    <button type="button" onclick="closeDialog()"
+                        class="-mr-1 flex p-2 rounded-md hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-white sm:-mr-2">
+                        <span class="sr-only">关闭</span>
+                        <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <main>
+        <section class="absolute w-full h-full">
+            <div id="divBackgroundImage" class="absolute top-0 w-full h-full bg-gray-900"
+                style="background-image: url(/images/login_background.avif); top: 0; left: 0; width: 100%; height: 100vh; background-position: center; background-size: cover;">
+            </div>
+            <div class="container mx-auto px-4 h-full opacity-95">
+                <div class="flex content-center items-center justify-center h-full">
+                    <div class="w-full lg:w-4/12 px-4">
+                        <!-- 查询 -->
+                        <div id="loginForm" style="display: flex;"
+                            class="relative flex flex-col min-w-0 break-words w-full mb-6 shadow-lg rounded-lg bg-gray-300 border-0">
+                            <div class="rounded-t mb-0 px-6 py-6">
+                                <div class="text-center mb-5">
+                                    <h6 class="text-gray-600 text-lg font-bold">
+                                        查询课程表
+                                    </h6>
+                                </div>
+                            </div>
+                            <div class="flex-auto px-4 lg:px-10 pb-6">
+                                <form>
+                                    <div class="relative w-full mb-3">
+                                        <label class="block text-gray-700 text-xs font-bold mb-2"
+                                            for="grid-password">学号</label><input id="login_sid" type="number"
+                                            min="20000000" max="99999999"
+                                            class="border-0 px-3 py-3 placeholder-gray-400 text-gray-700 bg-white rounded text-sm shadow focus:outline-none focus:ring w-full"
+                                            placeholder="学号" style="transition: all 0.15s ease 0s;" />
+                                    </div>
+                                    <div class="relative w-full mb-3">
+                                        <label class="block text-gray-700 text-xs font-bold mb-2"
+                                            for="grid-password">教务系统登录密码</label><input id="login_password"
+                                            id="login_password" type="password"
+                                            class="border-0 px-3 py-3 placeholder-gray-400 text-gray-700 bg-white rounded text-sm shadow focus:outline-none focus:ring w-full"
+                                            placeholder="教务系统登录密码" style="transition: all 0.15s ease 0s;" />
+                                    </div>
+                                    <div class="relative w-full mb-3">
+                                        <label class="block text-gray-700 text-xs font-bold mb-2"
+                                            for="grid-password">人机验证</label>
+                                        <div id="captcha" class="h-[40px]">&nbsp;&nbsp;&nbsp;&nbsp;验证码加载中…</div>
+                                    </div>
+                                    <div class="relative mt-6">
+                                        <label class="inline-flex items-center cursor-pointer"><input
+                                                id="login_remember_me" type="checkbox"
+                                                class="form-checkbox border-0 rounded text-gray-800 ml-1 w-5 h-5"
+                                                style="transition: all 0.15s ease 0s;" /><span
+                                                class="ml-2 text-sm font-semibold text-gray-700">记住我</span></label>
+                                    </div>
+                                    <div class="text-center mt-6">
+                                        <button id="login_button"
+                                            class="bg-gray-900 text-white active:bg-gray-700 text-sm font-bold uppercase px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 w-full"
+                                            type="button" style="transition: all 0.15s ease 0s;"
+                                            onclick="submitLoginFrom()">
+                                            查询
+                                        </button>
+                                    </div>
+                                </form>
+                                <div class="flex flex-wrap mt-4">
+                                    <div class="w-1/2">
+                                        <a onclick="showMeThePenguin()" class="text-gray-400 text-md opacity-10">
+                                            <small>ShowMeThePenguin~</small>
+                                        </a>
+                                    </div>
+                                    <div class="w-1/2 text-right">
+                                        <a onclick="switchToForm('usageForm')" class="text-gray-600 text-lg">
+                                            <small>使用方法</small>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 使用方法 -->
+                        <div id="usageForm" style="display: none;"
+                            class="relative flex flex-col min-w-0 break-words w-full mb-6 shadow-lg rounded-lg bg-gray-300 border-0">
+                            <div class="rounded-t mb-0 px-6 py-6">
+                                <div class="text-center mb-4">
+                                    <h6 class="text-gray-600 text-lg font-bold">
+                                        使用方法
+                                    </h6>
+                                </div>
+                            </div>
+                            <div class="flex-auto px-4 lg:px-10 pb-10">
+                                <p class="block text-gray-700 text-sm font-bold mb-2">
+                                    网页查询：输入学号和密码点击查询即可，显示课程表的链接是永久有效的，后续可以直接通过该链接访问，无需再次输入账号密码。
+                                </p>
+                                <p class="block text-gray-700 text-sm font-bold mb-2">
+                                    QQ查询：添加机器人(2895727556)为好友，根据提示绑定教务系统账号后即可查询指定时间的课程。一个QQ号可以绑定多个学号，一个学号也可以被多个QQ号绑定。
+                                </p>
+                                <div class="flex flex-wrap mt-4">
+                                    <div class="w-full text-right">
+                                        <a onclick="switchToForm('loginForm')" class="text-rose-500 text-lg">
+                                            <small>点击回到查询界面</small>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <footer class="absolute w-full bottom-0 bg-gray-900 pb-6 hidden sm:block">
+                <div class="container mx-auto px-4">
+                    <hr class="mb-6 border-b-1 border-gray-700" />
+                    <div class="flex flex-wrap items-center md:justify-between justify-center">
+                        <div class="w-full md:w-4/12 px-4">
+                            <div class="text-sm text-white font-semibold py-1">
+                                Copyright © 2022
+                                <a class="text-white text-sm font-semibold py-1">BruceChen</a>
+                            </div>
+                        </div>
+                        <div class="w-full md:w-8/12 px-4">
+                            <ul class="flex flex-wrap list-none md:justify-end  justify-center">
+                                <li>
+                                    <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer"
+                                        class="text-white hover:text-gray-400 text-sm font-semibold block py-1 px-3">鄂ICP备2021001088号</a>
+                                </li>
+                                <li>
+                                    <a href="https://brucec.cn/" target="_blank"
+                                        class="text-white hover:text-gray-400 text-sm font-semibold block py-1 px-3">博客</a>
+                                </li>
+                                <li>
+                                    <a href="https://opensource.org/licenses/AGPL-3.0" target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="text-white hover:text-gray-400 text-sm font-semibold block py-1 px-3">AGPL-3.0
+                                        License</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+        </section>
+    </main>
+    <script>
+        const dialog = document.getElementById("dialog");
+        const dialog_msg = document.getElementById("message");
+        function closeDialog() {
+            dialog.style.display = "none";
+        }
+        function showDialog(message) {
+            dialog_msg.innerText = message;
+            dialog.style.display = "block";
+        }
+        {
+            if (typeof (Storage) !== "undefined") {
+                if (localStorage.getItem("remember") == "true") {
+                    document.getElementById("login_remember_me").checked = true;
+                    let datas = JSON.parse(localStorage.getItem("datas"));
+                    document.getElementById("login_sid").value = datas.sid;
+                    document.getElementById("login_password").value = datas.password;
+                }
+            }
+        }
+        {
+            const ua = navigator.userAgent.toLowerCase();
+            const isMobile = () => {
+                let agents = ["Android", "iPhone", "SymbianOS", "Windows Phone", "iPod", "iPad"];
+                for (let i = 0; i < agents.length; i++) {
+                    if (ua.indexOf(agents[i].toLowerCase()) >= 0) return true;
+                }
+                return false;
+            }
+            const isQQ = () => {
+                return Boolean(ua.match(/qqbrowser/i));
+            }
+            if (isMobile() && isQQ()) {
+                showDialog("使用外置浏览器打开体验更佳qwq");
+                setTimeout(() => {
+                    closeDialog();
+                }, 4000);
+            }
+        }
+        {
+            login_captcha_token = '';
+            flag_pass_login_captcha = false;
+            loginCaptcha = _dx.Captcha(document.getElementById('captcha'), {
+                appId: '3c0c8056410c2e9a8bc6108cb3cec09a',
+                apiServer: 'https://proxy-api.dingxiang-inc.com',
+                style: 'inline',
+                width: document.getElementById("login_password").offsetWidth,
+                customLanguage: {
+                    pass_by_server: '无感验证成功'
+                },
+                success: function (token) {
+                    login_captcha_token = token;
+                    flag_pass_login_captcha = true;
+                }
+            });
+        }
+
+        const loginForm = document.getElementById('loginForm');
+        const usageForm = document.getElementById('usageForm');
+        function switchToForm(formName) {
+            closeDialog();
+            if (formName == 'loginForm') {
+                loginForm.style.display = 'flex';
+                usageForm.style.display = 'none';
+            } else if (formName == 'usageForm') {
+                loginForm.style.display = 'none';
+                usageForm.style.display = 'flex';
+            }
+        }
+        // switchToForm('usageForm');
+
+        function showMeThePenguin() {
+            loginForm.style.display = 'none';
+            usageForm.style.display = 'none';
+            setTimeout(() => {
+                loginForm.style.display = 'flex';
+            }, 2000);
+        }
+
+
+        function checkSid(sid) {
+            return sid.match(/^20\d{6}$/);
+        }
+
+        function submitLoginFrom() {
+            closeDialog();
+            let data = {
+                sid: document.getElementById("login_sid").value,
+                password: document.getElementById("login_password").value,
+                captcha: login_captcha_token
+            };
+            // console.log(data)
+            remember = document.getElementById("login_remember_me").checked
+            if (typeof (Storage) !== "undefined") {
+                if (remember) {
+                    localStorage.setItem('remember', "true");
+                    localStorage.setItem('datas', JSON.stringify({ 'sid': data.sid, 'password': data.password }));
+                } else {
+                    localStorage.setItem('remember', "false");
+                    localStorage.setItem('datas', "");
+                }
+            } else if (remember) {
+                alert("\n您使用的浏览器不支持存储内容！\n\n请检查是否开启了隐私模式。");
+            }
+            if (!checkSid(data.sid)) {
+                showDialog("请检查学号格式是否正确！");
+            } else if (!flag_pass_login_captcha) {
+                showDialog("请通过滑动验证码！");
+            } else {
+                showDialog("查询中，请稍后...");
+                let button = document.getElementById("login_button");
+                // button.setAttribute("disabled", true);
+                fetch('/api/getCurriculum', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                })
+                    .then(res => res.json())
+                    .then(json => {
+                        // console.log(json);
+                        if (json.code == 0) {
+                            showDialog("查询成功，正在跳转到课程表...");
+                            window.location = "/" + json.message + ".html";
+                        } else {
+                            flag_pass_login_captcha = false;
+                            loginCaptcha.reload();
+                            let msg = json.message;
+                            if (msg) {
+                                showDialog(msg);
+                            } else {
+                                showDialog("未知错误！");
+                            }
+                        }
+                        button.disabled = false;
+                    });
+            }
+        }
+
+    </script>
+</body>
+
+</html>

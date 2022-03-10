@@ -1,5 +1,5 @@
 # 项目介绍
-详见 https://brucec.cn/2022/03/09/CCUT-ClassSchedule/
+详见 https://brucec.cn/2022/03/03/CCUT-ClassSchedule/
 
 # 如何构建
 1. 前端部分

@@ -764,7 +764,7 @@ def updateCourseForAllUser():
             logger.info(result)
         except Exception as e:
             logger.exception(e)
-        time.sleep(random.randint(10, 30) / 10)
+        time.sleep(random.randint(100, 200) / 10)
     c.close()
     conn.close
 

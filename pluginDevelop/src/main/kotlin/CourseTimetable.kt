@@ -242,7 +242,11 @@ object CourseTimetable : KotlinPlugin(
         /* 自动加好友 */
         GlobalEventChannel.subscribeAlways<NewFriendRequestEvent> { event ->
             val QQ = event.fromId
-            event.accept()
+            try {
+                event.accept()
+            } catch (e: Exception) {
+                CourseTimetable.logger.warning(e)
+            }
             delay(500)
             val friend = Bot.getInstance(2895727556).getFriend(QQ)
             friend?.sendMessage(helpMsg)

@@ -9,26 +9,35 @@ import net.mamoe.mirai.Bot
 import net.mamoe.mirai.console.command.CommandManager.INSTANCE.register
 import net.mamoe.mirai.console.command.CommandManager.INSTANCE.unregister
 import net.mamoe.mirai.console.command.CommandSender
+import net.mamoe.mirai.console.command.ConsoleCommandSender
 import net.mamoe.mirai.console.command.SimpleCommand
 import net.mamoe.mirai.console.data.AutoSavePluginConfig
 import net.mamoe.mirai.console.data.value
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
 import net.mamoe.mirai.event.GlobalEventChannel
+import net.mamoe.mirai.event.events.BotInvitedJoinGroupRequestEvent
+import net.mamoe.mirai.event.events.BotOnlineEvent
 import net.mamoe.mirai.event.events.FriendMessageEvent
 import net.mamoe.mirai.event.events.NewFriendRequestEvent
 import net.mamoe.mirai.message.data.content
 import net.mamoe.mirai.utils.info
-import org.brucechen.Command_unbindkcb.handle
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
 import org.java_websocket.WebSocket
 import org.java_websocket.handshake.ClientHandshake
 import org.java_websocket.server.WebSocketServer
+import java.io.BufferedReader
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.sql.Connection
 import java.sql.DriverManager
 import java.text.ParseException
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.Period
+import java.time.ZoneId
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -87,6 +96,8 @@ const val queryShortStr = """发送相似指令均可查询课表
 
 查询完整课表请发送/mykcb"""
 
+var BotActive: Bot? = null
+
 val startOfTeachingWeek: Date = SimpleDateFormat("yyyy-MM-dd").parse("2022-2-28")!!
 
 var CourseTimetableserver: CourseWebSocketServer? = null
@@ -116,7 +127,7 @@ object CourseTimetable : KotlinPlugin(
         CourseTimetableDBConn = DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
         CourseTimetableDBConn!!.autoCommit = true
 
-        /* 定时任务 */
+        /* 推送定时任务 */
         val calendar = Calendar.getInstance()
         calendar.add(Calendar.DAY_OF_YEAR, 1)
         val nextExecuteDate = SimpleDateFormat("yyyy-MM-dd").format(calendar.time) + " 5:30:00"
@@ -125,18 +136,30 @@ object CourseTimetable : KotlinPlugin(
         val startDate = SimpleDateFormat("yyyy-MM-dd hh:mm:ss").parse(nextExecuteDate)
 //        Timer().schedule(TaskPushSchedule(), startDate, 60L * 1000L)
         Timer().schedule(TaskPushSchedule(), startDate, 24L * 3600L * 1000L)
-        logger.info { "插件加载成功" }
+
+        /* 更新天气定时任务 */
+        Timer().schedule(TaskUpdateWeather(), Date(0), 30L * 60L * 1000L)
+
+        /* 更新使用的机器人实例 */
+        GlobalEventChannel.subscribeAlways<BotOnlineEvent> { event ->
+            BotActive = event.bot
+            logger.info { "当前使用的QQ机器人: ${event.bot.id}" }
+        }
 
         /* 好友消息交互 */
         GlobalEventChannel.subscribeAlways<FriendMessageEvent> { event ->
-            val message = event.message.content.replace("\\s+".toRegex(),"")
+            val message = event.message.content.replace("\\s+".toRegex(), "")
             if ("你好[呀|啊]*[二|2]*号*".toRegex().matches(message) || "[二|2]*号*你好[呀|啊]*".toRegex().matches(message)) {
                 subject.sendMessage("你好呀qwq")
-            } else if ("晚上*好[二|2]*号*[呀|啊]*".toRegex().matches(message) || "[二|2]*号*晚上*好[呀|啊]*".toRegex().matches(message)) {
+            } else if ("晚上*好[二|2]*号*[呀|啊]*".toRegex().matches(message) || "[二|2]*号*晚上*好[呀|啊]*".toRegex()
+                    .matches(message)
+            ) {
                 subject.sendMessage("晚上好qwq")
             } else if ("晚安[二|2]*号*[呀|啊]*".toRegex().matches(message) || "[二|2]*号*晚安[呀|啊]*".toRegex().matches(message)) {
                 subject.sendMessage("晚安~")
-            } else if ("早上*好[二|2]*号*[呀|啊]*".toRegex().matches(message) || "[二|2]*号*早上*好[呀|啊]*".toRegex().matches(message)) {
+            } else if ("早上*好[二|2]*号*[呀|啊]*".toRegex().matches(message) || "[二|2]*号*早上*好[呀|啊]*".toRegex()
+                    .matches(message)
+            ) {
                 subject.sendMessage("早上好qwq")
             } else if ("早安[二|2]*号*[呀|啊]*".toRegex().matches(message) || "[二|2]*号*早安[呀|啊]*".toRegex().matches(message)) {
                 subject.sendMessage("早安~")
@@ -168,7 +191,9 @@ object CourseTimetable : KotlinPlugin(
                 if ("查*[询|找|看]*明[天|日]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex().matches(message)) {
                     calendarNow.add(Calendar.DAY_OF_YEAR, 1)
                     handleMessageQuery(event, dateFormat.parse(dateFormat.format(calendarNow.time)))
-                } else if ("查*[询|找|看]*今[天|日]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex().matches(message)) {
+                } else if ("查*[询|找|看]*今[天|日]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex()
+                        .matches(message) || message == "课表"
+                ) {
                     handleMessageQuery(event, dateFormat.parse(dateFormat.format(calendarNow.time)))
                 } else if ("查*[询|找|看]*昨[天|日]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex().matches(message)) {
                     calendarNow.add(Calendar.DAY_OF_YEAR, -1)
@@ -179,37 +204,49 @@ object CourseTimetable : KotlinPlugin(
                 } else if ("查*[询|找|看]*明[天|日]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex().matches(message)) {
                     calendarNow.add(Calendar.DAY_OF_YEAR, 3)
                     handleMessageQuery(event, dateFormat.parse(dateFormat.format(calendarNow.time)))
-                } else if ("查*[询|找|看]*上周[一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex().matches(message)) {
+                } else if ("查*[询|找|看]*上[周|星]期*[一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex()
+                        .matches(message)
+                ) {
                     val nowDayOfWeek: Int = getDayOfWeek(calendarNow.time)
                     val found = "([一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7])".toRegex().findAll(message)
-                    val needDayofweek:Int = chn2int[found.elementAt(0).value]!!
+                    val needDayofweek: Int = chn2int[found.elementAt(0).value]!!
                     calendarNow.add(Calendar.DAY_OF_YEAR, -7 + needDayofweek - nowDayOfWeek)
                     handleMessageQuery(event, dateFormat.parse(dateFormat.format(calendarNow.time)))
-                } else if ("查*[询|找|看]*[本|这|同|该]*周[一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex().matches(message)) {
+                } else if ("查*[询|找|看]*[本|这|同|该]*[周|星]期*[一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex()
+                        .matches(message)
+                ) {
                     val nowDayOfWeek: Int = getDayOfWeek(calendarNow.time)
                     val found = "([一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7])".toRegex().findAll(message)
-                    val needDayofweek:Int = chn2int[found.elementAt(0).value]!!
+                    val needDayofweek: Int = chn2int[found.elementAt(0).value]!!
                     calendarNow.add(Calendar.DAY_OF_YEAR, needDayofweek - nowDayOfWeek)
                     handleMessageQuery(event, dateFormat.parse(dateFormat.format(calendarNow.time)))
-                } else if ("查*[询|找|看]*下周[一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex().matches(message)) {
+                } else if ("查*[询|找|看]*下[周|星]期*[一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex()
+                        .matches(message)
+                ) {
                     val nowDayOfWeek: Int = getDayOfWeek(calendarNow.time)
                     val found = "([一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7])".toRegex().findAll(message)
-                    val needDayofweek:Int = chn2int[found.elementAt(0).value]!!
+                    val needDayofweek: Int = chn2int[found.elementAt(0).value]!!
                     calendarNow.add(Calendar.DAY_OF_YEAR, 7 + needDayofweek - nowDayOfWeek)
                     handleMessageQuery(event, dateFormat.parse(dateFormat.format(calendarNow.time)))
-                } else if ("查*[询|找|看]*下下周[一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex().matches(message)) {
+                } else if ("查*[询|找|看]*下下[周|星]期*[一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex()
+                        .matches(message)
+                ) {
                     val nowDayOfWeek: Int = getDayOfWeek(calendarNow.time)
                     val found = "([一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7])".toRegex().findAll(message)
-                    val needDayofweek:Int = chn2int[found.elementAt(0).value]!!
+                    val needDayofweek: Int = chn2int[found.elementAt(0).value]!!
                     calendarNow.add(Calendar.DAY_OF_YEAR, 14 + needDayofweek - nowDayOfWeek)
                     handleMessageQuery(event, dateFormat.parse(dateFormat.format(calendarNow.time)))
-                } else if ("查*[询|找|看]*下下下周[一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex().matches(message)) {
+                } else if ("查*[询|找|看]*下下下[周|星]期*[一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7]的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex()
+                        .matches(message)
+                ) {
                     val nowDayOfWeek: Int = getDayOfWeek(calendarNow.time)
                     val found = "([一|二|三|四|五|六|七|日|天|1|2|3|4|5|6|7])".toRegex().findAll(message)
-                    val needDayofweek:Int = chn2int[found.elementAt(0).value]!!
+                    val needDayofweek: Int = chn2int[found.elementAt(0).value]!!
                     calendarNow.add(Calendar.DAY_OF_YEAR, 21 + needDayofweek - nowDayOfWeek)
                     handleMessageQuery(event, dateFormat.parse(dateFormat.format(calendarNow.time)))
-                } else if ("查*[询|找|看]*(\\d{2,4})*[年|.|。|\\-|\\/|、]*(\\d{1,2})[月|.|。|\\-|\\/|、](\\d{1,2})[日|号]*的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex().matches(message)) {
+                } else if ("查*[询|找|看]*(\\d{2,4})*[年|.|。|\\-|\\/|、]*(\\d{1,2})[月|.|。|\\-|\\/|、](\\d{1,2})[日|号]*的*课*程*[表|本]*[有|是]*[什么|那|哪]*些*[啊|呀|呢]*".toRegex()
+                        .matches(message)
+                ) {
                     val found = "\\d+".toRegex().findAll(message)
                     val foundLen = found.count()
                     if (foundLen == 2 || (foundLen == 3 || found.elementAt(0).value.count() != 3)) {
@@ -221,10 +258,11 @@ object CourseTimetable : KotlinPlugin(
                             month = found.elementAt(0).value.toInt()
                             day = found.elementAt(1).value.toInt()
                         } else {
-                            year = if (found.elementAt(0).value.count() == 2)
-                                (calendarNow.get(Calendar.YEAR) / 100) * 100 + found.elementAt(0).value.toInt()
-                            else
-                                found.elementAt(0).value.toInt()
+                            year =
+                                if (found.elementAt(0).value.count() == 2) (calendarNow.get(Calendar.YEAR) / 100) * 100 + found.elementAt(
+                                    0
+                                ).value.toInt()
+                                else found.elementAt(0).value.toInt()
                             month = found.elementAt(1).value.toInt()
                             day = found.elementAt(2).value.toInt()
                         }
@@ -233,8 +271,9 @@ object CourseTimetable : KotlinPlugin(
                             handleMessageQuery(event, res)
                         } catch (_: ParseException) {
                         }
-
                     }
+                } else if (".*天气.*".toRegex().matches(message)) {
+                    subject.sendMessage(WeatherHelper.handleWeatherQuery(message))
                 }
             }
         }
@@ -248,15 +287,28 @@ object CourseTimetable : KotlinPlugin(
                 CourseTimetable.logger.warning(e)
             }
             delay(500)
-            val friend = Bot.getInstance(2895727556).getFriend(QQ)
+            val friend = BotActive!!.getFriend(QQ)
             friend?.sendMessage(helpMsg)
         }
+
+        /* 自动加群 */
+        GlobalEventChannel.subscribeAlways<BotInvitedJoinGroupRequestEvent> { event ->
+            try {
+                event.accept()
+            } catch (e: Exception) {
+                CourseTimetable.logger.warning(e)
+            }
+        }
+
 
         /* 注册指令 */
         Command_bindkcb.register()
         Command_unbindkcb.register()
         Command_setkcb.register()
         Command_mykcb.register()
+        Command_repush.register()
+
+        logger.info { "插件加载成功" }
     }
 
     override fun onDisable() {
@@ -268,6 +320,7 @@ object CourseTimetable : KotlinPlugin(
         Command_unbindkcb.unregister()
         Command_setkcb.unregister()
         Command_mykcb.unregister()
+        Command_repush.unregister()
     }
 }
 
@@ -283,11 +336,7 @@ fun getDayOfWeek(dt: Date): Int {
 }
 
 data class CourseInfo(
-    val name: String,
-    val teacher: String,
-    val weekStr: String,
-    val week: List<Int>,
-    val place: String
+    val name: String, val teacher: String, val weekStr: String, val week: List<Int>, val place: String
 )
 
 data class CourseOfDay(
@@ -298,7 +347,7 @@ data class CourseOfDay(
     val class5: List<CourseInfo>
 ) {
     operator fun get(i: Int): List<CourseInfo> {
-        return when(i) {
+        return when (i) {
             1 -> class1
             2 -> class2
             3 -> class3
@@ -310,8 +359,7 @@ data class CourseOfDay(
 }
 
 data class CourseNote(
-    val noteStr: String,
-    val noteClass: List<CourseInfo>
+    val noteStr: String, val noteClass: List<CourseInfo>
 )
 
 data class CourseOfWeek(
@@ -325,7 +373,7 @@ data class CourseOfWeek(
     val note: CourseNote?
 ) {
     operator fun get(i: Int): CourseOfDay {
-        return when(i) {
+        return when (i) {
             1 -> this.mon
             2 -> this.tue
             3 -> this.wed
@@ -354,16 +402,15 @@ suspend fun handleMessageQuery(event: FriendMessageEvent, queryTime: Date) {
         return
     }
     val QQ = event.user.id
-    if (CourseTimetableDBConn == null)
-        CourseTimetableDBConn = DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
+    if (CourseTimetableDBConn == null) CourseTimetableDBConn =
+        DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
     CourseTimetable.logger.info { "处理查询课程表" }
     val statement = CourseTimetableDBConn!!.createStatement()
     val statement2 = CourseTimetableDBConn!!.createStatement()
     val userList = statement.executeQuery("SELECT sid, pushOnWeekend FROM bind WHERE QQ = $QQ")
     val bindCountP = statement2.executeQuery("SELECT count(*) FROM bind WHERE QQ = $QQ")
     var bindCount: Int? = null
-    if (bindCountP.next())
-        bindCount = bindCountP.getInt(1)
+    if (bindCountP.next()) bindCount = bindCountP.getInt(1)
     var flagQuerySuccess = false
     try {
         while (userList.next()) {
@@ -374,18 +421,15 @@ suspend fun handleMessageQuery(event: FriendMessageEvent, queryTime: Date) {
                 val courseData: String? = coursePoint.getString("courseData")
                 val updateTime: String? = coursePoint.getString("updateTime")
                 if ((courseData == null) || courseData.isEmpty() || (updateTime == null) || updateTime.isEmpty()) {
-                    event.user.sendMessage("查询课程表失败：$sid 的课程表还未抓取成功(可能是密码错误或教务系统关闭等原因)。\n" +
-                            "\n" +
-                            "可以使用如下指令修改密码:\n" +
-                            "/bindkcb 学号 新密码")
+                    event.user.sendMessage(
+                        "查询课程表失败：$sid 的课程表还未抓取成功(可能是密码错误或教务系统关闭等原因)。\n\n可以使用如下指令修改密码:\n/bindkcb 学号 新密码"
+                    )
                     continue
                 }
                 val courseOfWeek: CourseOfWeek = gson.fromJson(courseData, CourseOfWeek::class.java)
                 val todayCourse = getActualCourseOfDay(courseOfWeek, queryTime)
-                if (bindCount!! > 1)
-                    pushCourseToUser(QQ, todayCourse, updateTime, queryTime, "$sid 的查询结果：\n")
-                else
-                    pushCourseToUser(QQ, todayCourse, updateTime, queryTime, null)
+                if (bindCount!! > 1) pushCourseToUser(QQ, todayCourse, updateTime, queryTime, "$sid 的查询结果：\n")
+                else pushCourseToUser(QQ, todayCourse, updateTime, queryTime, null)
             }
             delay((300..800).random().toLong())
         }
@@ -395,10 +439,8 @@ suspend fun handleMessageQuery(event: FriendMessageEvent, queryTime: Date) {
         statement.close()
         statement2.close()
     }
-    if (bindCount!! == 0)
-        event.user.sendMessage("查询课程表失败：当前未绑定任何账号，请使用如下指令进行绑定 /bindkcb 学号 教务系统登录密码")
-    else if (!flagQuerySuccess)
-        event.user.sendMessage("查询课程表失败：当前所绑定账号课程表还未抓取成功(可能是密码错误或教务系统关闭等原因)。\n\n可以使用如下指令修改密码:\n/bindkcb 学号 新密码")
+    if (bindCount!! == 0) event.user.sendMessage("查询课程表失败：当前未绑定任何账号，请使用如下指令进行绑定 /bindkcb 学号 教务系统登录密码")
+    else if (!flagQuerySuccess) event.user.sendMessage("查询课程表失败：当前所绑定账号课程表还未抓取成功(可能是密码错误或教务系统关闭等原因)。\n\n可以使用如下指令修改密码:\n/bindkcb 学号 新密码")
 }
 
 fun getActualCourseOfDay(courseOfWeek: CourseOfWeek, queryTime: Date): List<CourseInfo?> {
@@ -416,112 +458,113 @@ fun getActualCourseOfDay(courseOfWeek: CourseOfWeek, queryTime: Date): List<Cour
                 break
             }
         }
-        if (!flagFind)
-            res.add(null)
+        if (!flagFind) res.add(null)
     }
     return res
 }
 
-suspend fun pushCourseToUser(QQ: Long, courses: List<CourseInfo?>, updateTime: String, queryTime: Date?, headString: String?) {
-//    val friend = Bot.getInstance(2821579492L).getFriend(QQ) ?: return
-    val friend = Bot.getInstance(2895727556).getFriend(QQ) ?: return
+suspend fun pushCourseToUser(
+    QQ: Long, courses: List<CourseInfo?>, updateTime: String, queryTime: Date?, headString: String?
+) {
+    val friend = BotActive!!.getFriend(QQ) ?: return
     val int2chn = mapOf(
-        1 to "一",
-        2 to "二",
-        3 to "三",
-        4 to "四",
-        5 to "五",
-        6 to "六",
-        7 to "日"
+        1 to "一", 2 to "二", 3 to "三", 4 to "四", 5 to "五", 6 to "六", 7 to "日"
     )
     val int2circle = mapOf(
-        1 to "①",
-        2 to "②",
-        3 to "③",
-        4 to "④",
-        5 to "⑤"
+        1 to "①", 2 to "②", 3 to "③", 4 to "④", 5 to "⑤"
     )
     val myQueryTime = queryTime ?: Date()
     val weekOfTeaching = getWeekOfTeaching(myQueryTime)
     val dayOfWeek = getDayOfWeek(myQueryTime)
-    var res: String = headString ?: ""
-    res += if (queryTime == null) "今天是" else "查询"
-    res += SimpleDateFormat("MM月dd日").format(myQueryTime.time) + "星期" + int2chn[dayOfWeek] + " (第" + weekOfTeaching + "周)\n"
-    res += "(数据更新于$updateTime)"
+
+    val res = StringBuilder()
+    res.append(headString ?: "")
+    res.append(if (queryTime == null) "今天是" else "查询")
+    res.append(SimpleDateFormat("MM月dd日").format(myQueryTime.time))
+    res.append("星期").append(int2chn[dayOfWeek]).append(" (第").append(weekOfTeaching).append("周)\n")
+    res.append(WeatherHelper.getWeatherStr(myQueryTime))
+    res.append("(课表更新于$updateTime)")
     for (i in 1..5) {
         val course = courses[i - 1]
-        res += "\n\n" + int2circle[i] + " "
-        res += if (course == null) {
-            "空"
+        res.append("\n\n")
+        res.append(int2circle[i])
+        res.append(" ")
+        if (course == null) {
+            res.append("空")
         } else {
-            course.name + "(" + course.teacher + ")\n　 " + course.place
+            res.append(course.name).append("(").append(course.teacher).append(")\n　 ").append(course.place)
         }
     }
 
-    friend.sendMessage(res)
+    friend.sendMessage(res.toString())
 }
 
-fun IntRange.random() =
-    Random().nextInt((endInclusive + 1) - start) + start
+fun IntRange.random() = Random().nextInt((endInclusive + 1) - start) + start
 
-class TaskPushSchedule() : TimerTask() {
+suspend fun pushCourse() {
+    CourseTimetable.logger.info { "开始推送课程表" }
+    val dayOfWeek = getDayOfWeek(Date())
+    if (CourseTimetableDBConn == null) CourseTimetableDBConn =
+        DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
+    val statement = CourseTimetableDBConn!!.createStatement()
+    val statement2 = CourseTimetableDBConn!!.createStatement()
+    val userList = statement.executeQuery("SELECT sid, QQ, pushOnWeekend FROM bind WHERE pushMorning = 1")
+    while (userList.next()) {
+        val sid: Int = userList.getInt("sid")
+        val QQ: Long = userList.getLong("QQ")
+        val bindCountP = statement2.executeQuery("SELECT count(*) FROM bind WHERE QQ = $QQ")
+        var bindCount: Int? = null
+        if (bindCountP.next()) bindCount = bindCountP.getInt(1)
+        val coursePoint = statement2.executeQuery("SELECT courseData, updateTime FROM courses WHERE sid = $sid")
+        if (coursePoint.next()) {
+            val courseData: String? = coursePoint.getString("courseData")
+            val updateTime: String? = coursePoint.getString("updateTime")
+            if (courseData == null || courseData.isEmpty() || updateTime == null || updateTime.isEmpty()) {
+                BotActive!!.getFriend(QQ)
+                    ?.sendMessage("查询课程表失败：$sid 的课程表还未抓取成功(可能是密码错误或教务系统关闭等原因)，请使用如下指令进行修改密码 /bindkcb $sid 教务系统登录密码")
+                continue
+            }
+            val courseOfWeek: CourseOfWeek = gson.fromJson(courseData, CourseOfWeek::class.java)
+            val todayCourse = getActualCourseOfDay(courseOfWeek, Date())
+            if ((!userList.getBoolean("pushOnWeekend")) && (dayOfWeek == 6 || dayOfWeek == 7)) {
+                var flagPush = false
+                for (course in todayCourse) {
+                    if (course != null) {
+                        flagPush = true
+                        break
+                    }
+                }
+                if (!flagPush) continue
+            }
+            if (bindCount!! > 1) pushCourseToUser(QQ, todayCourse, updateTime, null, "用户 $sid 的推送:\n")
+            else pushCourseToUser(QQ, todayCourse, updateTime, null, null)
+            delay((5000..10000).random().toLong())
+        }
+    }
+    statement.close()
+    statement2.close()
+}
+
+class TaskPushSchedule : TimerTask() {
     @OptIn(DelicateCoroutinesApi::class)
     override fun run() {
-        GlobalScope.launch{
-            CourseTimetable.logger.info { "开始推送课程表" }
-            val dayOfWeek = getDayOfWeek(Date())
-            if (CourseTimetableDBConn == null)
-                CourseTimetableDBConn = DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
-            val statement = CourseTimetableDBConn!!.createStatement()
-            val statement2 = CourseTimetableDBConn!!.createStatement()
-            val userList = statement.executeQuery("SELECT sid, QQ, pushOnWeekend FROM bind WHERE pushMorning = 1")
-            while (userList.next()) {
-                val sid: Int = userList.getInt("sid")
-                val QQ: Long = userList.getLong("QQ")
-                val bindCountP = statement2.executeQuery("SELECT count(*) FROM bind WHERE QQ = $QQ")
-                var bindCount: Int? = null
-                if (bindCountP.next())
-                    bindCount = bindCountP.getInt(1)
-                val coursePoint = statement2.executeQuery("SELECT courseData, updateTime FROM courses WHERE sid = $sid")
-                if (coursePoint.next()) {
-                    val courseData: String? = coursePoint.getString("courseData")
-                    val updateTime: String? = coursePoint.getString("updateTime")
-                    if (courseData == null || courseData.isEmpty() || updateTime == null || updateTime.isEmpty()) {
-                        Bot.getInstance(2895727556).getFriend(QQ)?.sendMessage("查询课程表失败：$sid 的课程表还未抓取成功(可能是密码错误或教务系统关闭等原因)")
-                        continue
-                    }
-                    val courseOfWeek: CourseOfWeek = gson.fromJson(courseData, CourseOfWeek::class.java)
-                    val todayCourse = getActualCourseOfDay(courseOfWeek, Date())
-                    if ((!userList.getBoolean("pushOnWeekend")) && (dayOfWeek == 6 || dayOfWeek == 7)) {
-                        var flagPush = false
-                        for (course in todayCourse) {
-                            if (course != null) {
-                                flagPush = true
-                                break
-                            }
-                        }
-                        if (!flagPush)
-                            continue
-                    }
-                    if (bindCount!! > 1)
-                        pushCourseToUser(QQ, todayCourse, updateTime, null, "用户 $sid 的推送:\n")
-                    else
-                        pushCourseToUser(QQ, todayCourse, updateTime, null, null)
-                    delay((800..2000).random().toLong())
-                }
-            }
-            statement.close()
-            statement2.close()
+        GlobalScope.launch {
+            pushCourse()
         }
     }
 }
 
+class TaskUpdateWeather : TimerTask() {
+    @OptIn(DelicateCoroutinesApi::class)
+    override fun run() {
+        GlobalScope.launch {
+            WeatherHelper.updateWeather()
+        }
+    }
+}
 
 data class UserInfo(
-    val QQ: String,
-    val username: String,
-    val password: String,
-    val type: String
+    val QQ: String, val username: String, val password: String, val type: String
 )
 
 fun checkSid(sid: String): Boolean {
@@ -530,12 +573,11 @@ fun checkSid(sid: String): Boolean {
 }
 
 object Command_bindkcb : SimpleCommand(
-    CourseTimetable, "bindkcb", "绑定教务系统账号",
-    description = "绑定教务系统账号, 用法 /bindkcb 学号 密码"
+    CourseTimetable, "bindkcb", "绑定教务系统账号", description = "绑定教务系统账号, 用法 /bindkcb 学号 密码"
 ) {
     @Handler
     suspend fun CommandSender.handle(studentID: String, passwd: String) {
-        val sid = studentID.replace("\\s".toRegex(),"")
+        val sid = studentID.replace("\\s".toRegex(), "")
         if (!checkSid(sid)) {
             sendMessage("绑定教务系统账号失败：学号格式不正确")
             return
@@ -547,19 +589,18 @@ object Command_bindkcb : SimpleCommand(
 }
 
 object Command_unbindkcb : SimpleCommand(
-    CourseTimetable, "unbindkcb", "解除绑定教务系统账号",
-    description = "解除绑定教务系统账号, 用法 /unbindkcb 学号"
+    CourseTimetable, "unbindkcb", "解除绑定教务系统账号", description = "解除绑定教务系统账号, 用法 /unbindkcb 学号"
 ) {
     @Handler
     suspend fun CommandSender.handle(studentID: String) {
-        val sid = studentID.replace("\\s".toRegex(),"")
+        val sid = studentID.replace("\\s".toRegex(), "")
         if (!checkSid(sid)) {
             sendMessage("绑定教务系统账号失败：学号格式不正确")
             return
         }
         val QQ = this.user!!.id
-        if (CourseTimetableDBConn == null)
-            CourseTimetableDBConn = DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
+        if (CourseTimetableDBConn == null) CourseTimetableDBConn =
+            DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
         val statement = CourseTimetableDBConn!!.createStatement()
         val resultQQ = statement.executeQuery("SELECT 1 FROM bind WHERE sid = $sid and QQ = $QQ")
         if (resultQQ.next()) {
@@ -573,24 +614,24 @@ object Command_unbindkcb : SimpleCommand(
 }
 
 object Command_setkcb : SimpleCommand(
-    CourseTimetable, "setkcb", "课程表推送设置",
-    description = "每日课程表推送设置, 用法 /setkcb [push/wkpush] 学号 [on/off]"
+    CourseTimetable, "setkcb", "课程表推送设置", description = "每日课程表推送设置, 用法 /setkcb [push/wkpush] 学号 [on/off]"
 ) {
     @Handler
-    suspend fun CommandSender.handle(cmd : String, studentID: String, enabled: String) {
-        val sid = studentID.replace("\\s".toRegex(),"")
+    suspend fun CommandSender.handle(cmd: String, studentID: String, enabled: String) {
+        val sid = studentID.replace("\\s".toRegex(), "")
         if (!checkSid(sid)) {
             sendMessage("绑定教务系统账号失败：学号格式不正确")
             return
         }
         if ((!(enabled == "on" || enabled == "off")) || (!(cmd == "push" || cmd == "wkpush"))) {
-            sendMessage("修改推送设置失败：指令不正确\n\n每日课程表推送开关\n用法 /setkcb push 学号 on/off\n\n" +
-                    "周末无课程时课程表推送开关,\n用法 /setkcb wkpush 学号 on/off")
+            sendMessage(
+                "修改推送设置失败：指令不正确\n\n每日课程表推送开关\n用法 /setkcb push 学号 on/off\n\n" + "周末无课程时课程表推送开关,\n用法 /setkcb wkpush 学号 on/off"
+            )
             return
         }
 
-        if (CourseTimetableDBConn == null)
-            CourseTimetableDBConn = DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
+        if (CourseTimetableDBConn == null) CourseTimetableDBConn =
+            DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
         val statement = CourseTimetableDBConn!!.createStatement()
 
         val QQ = this.user!!.id
@@ -601,7 +642,7 @@ object Command_setkcb : SimpleCommand(
             return
         }
 
-        val enableInt:Int = if (enabled == "on") 1 else 0
+        val enableInt: Int = if (enabled == "on") 1 else 0
         val enableStr = if (enabled == "on") "启用" else "禁用"
         if (cmd == "push") {
             statement.executeUpdate("UPDATE bind SET pushMorning = $enableInt WHERE sid = $sid and QQ = $QQ")
@@ -615,27 +656,26 @@ object Command_setkcb : SimpleCommand(
 }
 
 object Command_mykcb : SimpleCommand(
-    CourseTimetable, "mykcb", "获取完整课程表网页链接",
-    description = "获取完整课程表网页链接, 用法 /mykcb"
+    CourseTimetable, "mykcb", "获取完整课程表网页链接", description = "获取完整课程表网页链接, 用法 /mykcb"
 ) {
     @Handler
     suspend fun CommandSender.handle() {
         val num2circle = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
         val QQ = this.user!!.id
-        if (CourseTimetableDBConn == null)
-            CourseTimetableDBConn = DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
+        if (CourseTimetableDBConn == null) CourseTimetableDBConn =
+            DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
         val statement = CourseTimetableDBConn!!.createStatement()
 
         val bindCountP = statement.executeQuery("SELECT count(*) FROM bind WHERE QQ = $QQ")
         var bindCount: Int? = null
-        if (bindCountP.next())
-            bindCount = bindCountP.getInt(1)
+        if (bindCountP.next()) bindCount = bindCountP.getInt(1)
         if (bindCount == null || bindCount == 0) {
             statement.close()
             sendMessage("获取完整课程表失败：不存在绑定关系，请使用如下指令进行绑定 /bindkcb 学号 教务系统登录密码")
-        }else if (bindCount == 1) {
+        } else if (bindCount == 1) {
             sendMessage("复制到浏览器打开体验更佳，QQ内置浏览器有几率显示不完全")
-            val resultUrl = statement.executeQuery("SELECT courses.userID FROM bind JOIN courses ON bind.sid = courses.sid WHERE bind.QQ = $QQ ")
+            val resultUrl =
+                statement.executeQuery("SELECT courses.userID FROM bind JOIN courses ON bind.sid = courses.sid WHERE bind.QQ = $QQ ")
             val resultMsg = StringBuilder()
             if (resultUrl.next()) {
                 resultMsg.append("https://kcb.brucec.cn/")
@@ -646,7 +686,8 @@ object Command_mykcb : SimpleCommand(
             delay(256)
             sendMessage(resultMsg.toString())
         } else if (bindCount > 1) {
-            val resultUrl = statement.executeQuery("SELECT courses.sid, courses.userID FROM bind JOIN courses ON bind.sid = courses.sid WHERE bind.QQ = $QQ ")
+            val resultUrl =
+                statement.executeQuery("SELECT courses.sid, courses.userID FROM bind JOIN courses ON bind.sid = courses.sid WHERE bind.QQ = $QQ ")
             val resultMsg = StringBuilder()
             resultMsg.append("##### 完整课程表 #####\n")
             var msgCnt = 0
@@ -668,17 +709,157 @@ object Command_mykcb : SimpleCommand(
     }
 }
 
+object Command_repush : SimpleCommand(
+    CourseTimetable, "repush", "重新推送", description = "重新推送"
+) {
+    @Handler
+    suspend fun ConsoleCommandSender.handle() {
+        pushCourse()
+    }
+}
 
 object CourseTimetableConfig : AutoSavePluginConfig("CourseTimetable") {
     val WebSocketPort by value<Int>(52225)
     val DatabasePos by value<String>("../ClassSchedule.db")
+    val WetherApiParameter by value<String>("location=125.28,43.85&key=your_api_key")
+}
+
+object WeatherHelper {
+    private var lastUpdateTime = Date(0)
+    private var weather: WeatherGetResult? = null
+
+    data class WeatherOfDay(
+        val fxDate: String,
+        val sunrise: String,
+        val sunset: String,
+        val moonrise: String,
+        val moonset: String,
+        val moonPhase: String,
+        val moonPhaseIcon: String,
+        val tempMax: String,
+        val tempMin: String,
+        val iconDay: String,
+        val textDay: String,
+        val iconNight: String,
+        val textNight: String,
+        val wind360Day: String,
+        val windDirDay: String,
+        val windScaleDay: String,
+        val windSpeedDay: String,
+        val wind360Night: String,
+        val windDirNight: String,
+        val windScaleNight: String,
+        val windSpeedNight: String,
+        val humidity: String,
+        val precip: String,
+        val pressure: String,
+        val vis: String,
+        val cloud: String?,
+        val uvIndex: String
+    )
+
+    data class WeatherRefer(
+        val sources: List<String>?, val license: List<String>?
+    )
+
+    data class WeatherGetResult(
+        val code: String,
+        val updateTime: String,
+        val fxLink: Boolean,
+        val daily: List<WeatherOfDay>,
+        val refer: WeatherRefer
+    )
+
+    private fun httpGet(url: String): String? {
+        return try {
+            val stringBuilder = StringBuilder()
+            val okHttpClient =
+                OkHttpClient().newBuilder().connectTimeout(5, TimeUnit.SECONDS).readTimeout(10, TimeUnit.SECONDS)
+                    .writeTimeout(10, TimeUnit.SECONDS).build()
+            val request: Request = Request.Builder().url(url).build()
+            val response: Response = okHttpClient.newCall(request).execute()
+            response.body.use { responseBody ->
+                val bufferedReader = BufferedReader(Objects.requireNonNull(responseBody)!!.charStream())
+                var line: String?
+                while (bufferedReader.readLine().also { line = it } != null) {
+                    stringBuilder.append(line)
+                }
+                response.close()
+            }
+            stringBuilder.toString()
+        } catch (e: java.lang.Exception) {
+            CourseTimetable.logger.warning(url + ":" + e.message)
+            null
+        }
+    }
+
+    fun updateWeather() {
+        CourseTimetable.logger.info { "Start update weather." }
+        val url = "https://devapi.qweather.com/v7/weather/7d?" + CourseTimetableConfig.WetherApiParameter
+        val getRes = this.httpGet(url)
+        if (getRes != null) {
+            try {
+                this.lastUpdateTime = Date()
+                val weatherUpd = gson.fromJson(getRes, WeatherGetResult::class.java)
+                if (weatherUpd != null && weatherUpd.code == "200")
+                    this.weather = weatherUpd
+            } catch (e: Exception) {
+                CourseTimetable.logger.warning("result: " + getRes + "\nerr: " + e.message)
+            }
+        }
+        CourseTimetable.logger.info { "End update weather." }
+    }
+
+    private fun date2LocalDate(date: Date): LocalDate? {
+        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
+    }
+
+    fun getWeatherStr(queryDate: Date): String {
+        val res = StringBuilder()
+        val period = Period.between(this.date2LocalDate(this.lastUpdateTime), this.date2LocalDate(queryDate))
+        if (period.years == 0 && period.months == 0 && period.days >= 0 && period.days <= 6) {
+            if (this.weather == null) this.updateWeather()
+            if (this.weather != null && this.weather!!.code == "200") {
+                val weatherOfDay = this.weather!!.daily[period.days]
+                res.append(weatherOfDay.textDay)
+                res.append("　")
+                res.append(weatherOfDay.tempMin)
+                res.append("° ~ ")
+                res.append(weatherOfDay.tempMax)
+                res.append("°　紫外线")
+                val uvIndex = weatherOfDay.uvIndex.toInt()
+                if (uvIndex <= 2) {
+                    res.append("很弱")
+                } else if (uvIndex <= 4) {
+                    res.append("弱")
+                } else if (uvIndex <= 6) {
+                    res.append("中等")
+                } else if (uvIndex <= 9) {
+                    res.append("强")
+                } else {
+                    res.append("很强")
+                }
+                res.append("\n")
+                res.append(weatherOfDay.windDirDay)
+                res.append(weatherOfDay.windScaleDay)
+                res.append("级　相对湿度")
+                res.append(weatherOfDay.humidity)
+                res.append("%\n")
+            }
+        }
+        return res.toString()
+    }
+
+    fun handleWeatherQuery(message: String): String {
+        val res = StringBuilder()
+        res.append("查看详情天气请前往：\n")
+        res.append("https://www.qweather.com/weather30d/kuancheng-101060109.html")
+        return res.toString()
+    }
 }
 
 data class BindResult(
-    val QQ: String,
-    val username: String,
-    val status: Boolean,
-    val reason: String?
+    val QQ: String, val username: String, val status: Boolean, val reason: String?
 )
 
 class CourseWebSocketServer(port: Int) : WebSocketServer(InetSocketAddress(port)) {
@@ -693,17 +874,20 @@ class CourseWebSocketServer(port: Int) : WebSocketServer(InetSocketAddress(port)
 
     @OptIn(DelicateCoroutinesApi::class)
     override fun onMessage(conn: WebSocket, message: String) {
-        if (message == "ping") conn.send("pong")
+        if (message == "ping") {
+            conn.send("pong")
+            return
+        }
         CourseTimetable.logger.info { "Websocket $conn: $message" }
-        GlobalScope.launch{
+        GlobalScope.launch {
             try {
                 val bindResult = gson.fromJson(message, BindResult::class.java)
                 val QQ = bindResult.QQ.toLong()
-                val friend = Bot.getInstance(2895727556).getFriend(QQ) ?: return@launch
+                val friend = BotActive!!.getFriend(QQ) ?: return@launch
                 val sid = bindResult.username
                 if (bindResult.status) {
-                    if (CourseTimetableDBConn == null)
-                        CourseTimetableDBConn = DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
+                    if (CourseTimetableDBConn == null) CourseTimetableDBConn =
+                        DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
                     val statement = CourseTimetableDBConn!!.createStatement()
                     val resultQQ = statement.executeQuery("SELECT 1 FROM bind WHERE sid = $sid and QQ = $QQ")
                     if (!resultQQ.next()) // 未绑定过，插入数据库
@@ -723,7 +907,7 @@ class CourseWebSocketServer(port: Int) : WebSocketServer(InetSocketAddress(port)
                         }
                     }
                 }
-            } catch (e : Exception) {
+            } catch (e: Exception) {
                 CourseTimetable.logger.error(e)
             }
         }

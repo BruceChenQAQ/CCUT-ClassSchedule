@@ -1,11 +1,7 @@
 import os
 import re
 import docx
-import sqlite3
-
-# 数据库地址
-DB_PATH = "../ClassSchedule_debug.db"
-conn = sqlite3.connect(DB_PATH)
+import json
 
 pathNow = os.getcwd()
 path2docx = pathNow + "\\docxFiles\\"
@@ -51,6 +47,7 @@ def parseSectionStr(sectionList, sectionText):
 
     sectionList["section"] = section
 
+labCourseAll = []
 
 fileNameList = os.listdir(path2docx)
 for fileName in fileNameList:
@@ -181,23 +178,9 @@ for fileName in fileNameList:
     if len(info["courseList"]) == 0:
         raise Exception("未找到表格")
 
-    for course in info["courseList"]:
-        print(course)
-        c = conn.cursor()
-        c.execute(
-            "INSERT INTO labs (name, semester, teacher, week, dayOfWeek, section, className, classroom) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                info["name"],
-                info["semester"],
-                info["teacher"],
-                course["week"],
-                course["dayOfWeek"],
-                course["section"],
-                course["className"],
-                course["classroom"],
-            ),
-        )
-        c.close()
-    conn.commit()
+    labCourseAll.append(info)
 
     # break
+
+with open("labCourseAll.json", "w") as f:
+    json.dump(labCourseAll, f, ensure_ascii=False, indent=4)

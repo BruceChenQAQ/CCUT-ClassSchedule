@@ -159,3 +159,4 @@ cython_debug/
 /ClassSchedule_debug.db
 /labCourseCrawl/docFiles/*
 /labCourseCrawl/docxFiles/*
+/labCourseCrawl/labCourseAll.json

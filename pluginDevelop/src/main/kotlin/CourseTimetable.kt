@@ -167,6 +167,8 @@ object CourseTimetable : KotlinPlugin(
                 subject.sendMessage(helpMsg)
             } else if (message == "快捷指令" || message == "快捷命令" || message == "快捷查询" || message == "快捷" || message == "快速查询" || message == "快速命令") {
                 subject.sendMessage(queryShortStr)
+            } else if (".*实验.*".toRegex().matches(message)) {
+                subject.sendMessage("实验课会和普通课表一起显示，正常执行查询命令即可。\n\n (发送\"快捷指令\"查看支持的查询命令)")
             } else {
                 val chn2int = mapOf(
                     "一" to 1,
@@ -178,13 +180,18 @@ object CourseTimetable : KotlinPlugin(
                     "七" to 7,
                     "日" to 7,
                     "天" to 7,
+                    "八" to 8,
+                    "九" to 9,
+                    "0" to 0,
                     "1" to 1,
                     "2" to 2,
                     "3" to 3,
                     "4" to 4,
                     "5" to 5,
                     "6" to 6,
-                    "7" to 7
+                    "7" to 7,
+                    "8" to 8,
+                    "9" to 9
                 )
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd")
                 val calendarNow = Calendar.getInstance()
@@ -274,6 +281,42 @@ object CourseTimetable : KotlinPlugin(
                     }
                 } else if (".*天气.*".toRegex().matches(message)) {
                     subject.sendMessage(WeatherHelper.handleWeatherQuery(message))
+                } else if ("查?[询|找|看]?第?([一二三四五六七八九十0123456789]+)周周?([一二三四五六七日1234567]?)的?课?程?[表|本]?[有|是]?[什么|那|哪]?些?[啊|呀|呢]?".toRegex()
+                        .matches(message)
+                ) {
+                    val textNumberOfDay = "([一二三四五六七八九十0123456789]+)周".toRegex().findAll(message).elementAt(0).groups[1]!!.value
+                    var numberOfDay:Int = 0
+                    for (c in textNumberOfDay) {
+                        if (c == '十') {
+                            if (numberOfDay == 0) {
+                                numberOfDay = 1
+                            }
+                            continue
+                        } else if (chn2int.containsKey(c.toString())) {
+                            numberOfDay *= 10
+                            numberOfDay += chn2int[c.toString()]!!.toInt()
+                        }
+                    }
+                    if (textNumberOfDay == "十")
+                        numberOfDay = 10
+                    val textNumberOfWeek = "周([一二三四五六七日1234567])".toRegex().findAll(message).elementAtOrNull(0)
+                    val numberOfWeek:Int = if (textNumberOfWeek == null) {
+                        1
+                    } else {
+                        chn2int[textNumberOfWeek.groups[1]!!.value]!!.toInt()
+                    }
+
+                    calendarNow.time = startOfTeachingWeek
+                    calendarNow.add(Calendar.DAY_OF_YEAR, 7 * (numberOfDay - 1) + (numberOfWeek - 1))
+
+                    handleMessageQuery(event, dateFormat.parse(dateFormat.format(calendarNow.time)))
+                }
+
+                if ("查?[询|找|看]完?整?课程?[表|本][有|是]?[什么|那|哪]?些?[啊|呀|呢]?".toRegex()
+                        .matches(message)
+                ) {
+                    delay(200)
+                    getFullCourseTable(event.friend.id)
                 }
             }
         }
@@ -706,57 +749,61 @@ object Command_setkcb : SimpleCommand(
     }
 }
 
+suspend fun getFullCourseTable(QQ: Long) {
+    val friend = BotActive!!.getFriend(QQ) ?: return
+    val num2circle = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
+    if (CourseTimetableDBConn == null) CourseTimetableDBConn =
+        DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
+    val statement = CourseTimetableDBConn!!.createStatement()
+
+    val bindCountP = statement.executeQuery("SELECT count(*) FROM bind WHERE QQ = $QQ")
+    var bindCount: Int? = null
+    if (bindCountP.next()) bindCount = bindCountP.getInt(1)
+    if (bindCount == null || bindCount == 0) {
+        statement.close()
+        friend.sendMessage("获取完整课程表失败：不存在绑定关系，请使用如下指令进行绑定 /bindkcb 学号 教务系统登录密码")
+    } else if (bindCount == 1) {
+        friend.sendMessage("复制到浏览器打开体验更佳，QQ内置浏览器有几率显示不完全")
+        val resultUrl =
+            statement.executeQuery("SELECT courses.userID FROM bind JOIN courses ON bind.sid = courses.sid WHERE bind.QQ = $QQ ")
+        val resultMsg = StringBuilder()
+        if (resultUrl.next()) {
+            resultMsg.append("https://kcb.brucec.cn/")
+            resultMsg.append(resultUrl.getString(1))
+            resultMsg.append(".html")
+        }
+        statement.close()
+        delay(256)
+        friend.sendMessage(resultMsg.toString())
+    } else if (bindCount > 1) {
+        val resultUrl =
+            statement.executeQuery("SELECT courses.sid, courses.userID FROM bind JOIN courses ON bind.sid = courses.sid WHERE bind.QQ = $QQ ")
+        val resultMsg = StringBuilder()
+        resultMsg.append("##### 完整课程表 #####\n")
+        var msgCnt = 0
+        while (resultUrl.next()) {
+            resultMsg.append("\n")
+            resultMsg.append(num2circle[msgCnt])
+            resultMsg.append(resultUrl.getString(1))
+            resultMsg.append("\n\n")
+            resultMsg.append("https://kcb.brucec.cn/")
+            resultMsg.append(resultUrl.getString(2))
+            resultMsg.append(".html\n")
+            msgCnt++
+            if (msgCnt >= 20) msgCnt = 19
+        }
+        statement.close()
+        resultMsg.append("\n复制到浏览器打开体验更佳，QQ内置浏览器有几率显示不完全。（此链接永久有效）")
+        friend.sendMessage(resultMsg.toString())
+    }
+}
+
 object Command_mykcb : SimpleCommand(
     CourseTimetable, "mykcb", "获取完整课程表网页链接", description = "获取完整课程表网页链接, 用法 /mykcb"
 ) {
     @Handler
     suspend fun CommandSender.handle() {
-        val num2circle = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
-        val QQ = this.user!!.id
-        if (CourseTimetableDBConn == null) CourseTimetableDBConn =
-            DriverManager.getConnection("jdbc:sqlite:" + CourseTimetableConfig.DatabasePos)
-        val statement = CourseTimetableDBConn!!.createStatement()
-
-        val bindCountP = statement.executeQuery("SELECT count(*) FROM bind WHERE QQ = $QQ")
-        var bindCount: Int? = null
-        if (bindCountP.next()) bindCount = bindCountP.getInt(1)
-        if (bindCount == null || bindCount == 0) {
-            statement.close()
-            sendMessage("获取完整课程表失败：不存在绑定关系，请使用如下指令进行绑定 /bindkcb 学号 教务系统登录密码")
-        } else if (bindCount == 1) {
-            sendMessage("复制到浏览器打开体验更佳，QQ内置浏览器有几率显示不完全")
-            val resultUrl =
-                statement.executeQuery("SELECT courses.userID FROM bind JOIN courses ON bind.sid = courses.sid WHERE bind.QQ = $QQ ")
-            val resultMsg = StringBuilder()
-            if (resultUrl.next()) {
-                resultMsg.append("https://kcb.brucec.cn/")
-                resultMsg.append(resultUrl.getString(1))
-                resultMsg.append(".html")
-            }
-            statement.close()
-            delay(256)
-            sendMessage(resultMsg.toString())
-        } else if (bindCount > 1) {
-            val resultUrl =
-                statement.executeQuery("SELECT courses.sid, courses.userID FROM bind JOIN courses ON bind.sid = courses.sid WHERE bind.QQ = $QQ ")
-            val resultMsg = StringBuilder()
-            resultMsg.append("##### 完整课程表 #####\n")
-            var msgCnt = 0
-            while (resultUrl.next()) {
-                resultMsg.append("\n")
-                resultMsg.append(num2circle[msgCnt])
-                resultMsg.append(resultUrl.getString(1))
-                resultMsg.append("\n\n")
-                resultMsg.append("https://kcb.brucec.cn/")
-                resultMsg.append(resultUrl.getString(2))
-                resultMsg.append(".html\n")
-                msgCnt++
-                if (msgCnt >= 20) msgCnt = 19
-            }
-            statement.close()
-            resultMsg.append("\n复制到浏览器打开体验更佳，QQ内置浏览器有几率显示不完全。（此链接永久有效）")
-            sendMessage(resultMsg.toString())
-        }
+        getFullCourseTable(this.user!!.id)
     }
 }
 

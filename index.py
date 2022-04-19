@@ -1,4 +1,5 @@
 # -*- coding:utf-8 -*-
+from email import header
 import os
 import re
 import rsa
@@ -39,9 +40,13 @@ privkey = rsa.PrivateKey.load_pkcs1(
 )
 
 # 爬虫使用的代理
-proxies = {
+proxies1 = {
     "http": "socks5://127.0.0.1:QAQ",
     "https": "socks5://127.0.0.1:QAQ",
+}
+proxies2 = {
+    "http": "socks5://127.0.0.1:QAQAQ",
+    "https": "socks5://127.0.0.1:QAQAQ",
 }
 
 # Flask的密钥 (未使用)
@@ -439,6 +444,51 @@ class Crawler:
         except Exception as e:
             logger.exception(e)
 
+    @staticmethod
+    def getPersonalInfo(session):
+        info = {
+            "name": None,
+            "className": None,
+        }
+        timeStr = str(int(time.time())) + "000"
+        personalInfoHeader = {
+            "Accept": "text/html, application/xhtml+xml, image/jxr, */*",
+            "Accept-Encoding": "gzip, deflate",
+            "Accept-Language": "zh-CN",
+            "Cache-Control": "no-cache",
+            "Connection": "Keep-Alive",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Host": "ea.ccut.edu.cn",
+            "Referer": "http://ea.ccut.edu.cn/framework/new_window.jsp?lianjie=&winid=win1",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko",
+        }
+        personalInfoUrl = (
+            "http://ea.ccut.edu.cn/xszhxxAction.do?method=addStudentPic&tktime="
+            + timeStr
+        )
+        res = session.get(personalInfoUrl, headers=personalInfoHeader)
+        # print(res.text)
+
+        classText = re.search(
+            '<span\sclass="\w+">班级:(.*?)</span>',
+            res.content.decode("utf-8"),
+        )
+        if len(classText.groups()) == 1:
+            info['className'] = classText.group(1)
+        else:
+            return None
+
+        nameText = re.search(
+            '<td\swidth="\d+"\sheight="\d+">姓名</td>\s+<td\swidth="\d+"\sheight="\d+">(.*?)</td>',
+            res.content.decode("utf-8"),
+        )
+        if len(nameText.groups()) == 1:
+            info['name'] = nameText.group(1)
+        else:
+            return None
+
+        return info
+
 
 class User:
     captcha_session = requests.Session()
@@ -664,7 +714,12 @@ def updateCourse(conn, username, password):
     logger.info("正在更新 " + username + " 的课表")
     session = requests.Session()
     if len(sys.argv) >= 3 and sys.argv[2] == "proxy":
-        session.proxies = proxies
+        session.proxies = proxies1
+        try:
+            session.get("http://ea.ccut.edu.cn/")
+        except:
+            logger.info("主代理离线!")
+            session.proxies = proxies2
     try:
         loginRes = Crawler.login(session, username, password)
         if loginRes == "success":
@@ -680,11 +735,17 @@ def updateCourse(conn, username, password):
                     )
                     userID = cursor.fetchone()
                     if userID is None:
+                        personalInfo = Crawler.getPersonalInfo(session)
+                        logger.info("姓名: {}, 班级: {}".format(personalInfo['name'], personalInfo['className']))
+                        if personalInfo is None:
+                            raise Exception("[err]get personal info error")
                         newUserID = User.getNewUserID(conn)
                         c2.execute(
-                            "INSERT INTO courses (sid, passwd, courseData, updateTime, userID) VALUES (?, ?, ?, ?, ?)",
+                            "INSERT INTO courses (sid, name, className, passwd, courseData, updateTime, userID) VALUES (?, ?, ?, ?, ?, ?, ?)",
                             (
                                 username,
+                                personalInfo['name'],
+                                personalInfo['className'],
                                 User.encrypt_password(password),
                                 courseData,
                                 timeStr,
@@ -722,11 +783,17 @@ def updateCourse(conn, username, password):
                     )
                     userID = cursor.fetchone()
                     if userID is None:
+                        personalInfo = Crawler.getPersonalInfo(session)
+                        logger.info("姓名: {}, 班级: {}".format(personalInfo['name'], personalInfo['className']))
+                        if personalInfo is None:
+                            raise Exception("[err]get personal info error")
                         newUserID = User.getNewUserID(conn)
                         c2.execute(
-                            "INSERT INTO courses (sid, passwd, userID) VALUES (?, ?, ?)",
+                            "INSERT INTO courses (sid, name, className, passwd, userID) VALUES (?, ?, ?, ?, ?)",
                             (
                                 username,
+                                personalInfo['name'],
+                                personalInfo['className'],
                                 User.encrypt_password(password),
                                 newUserID,
                             ),
@@ -747,7 +814,7 @@ def updateCourse(conn, username, password):
             return loginRes
     except Exception as e:
         logger.exception(e)
-        return "[err]unknown error"
+        return "[err]network error"
 
 
 def updateCourseForAllUser():

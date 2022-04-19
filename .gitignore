@@ -155,3 +155,5 @@ cython_debug/
 /pluginDevelop/.gradle
 /pluginDevelop/.idea
 /CaptchaImgs/tmp.jpg
+/setting.py
+/ClassSchedule_debug.db

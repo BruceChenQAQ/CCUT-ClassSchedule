@@ -339,6 +339,10 @@ data class CourseInfo(
     val name: String, val teacher: String, val weekStr: String, val week: List<Int>, val place: String
 )
 
+data class LabCourseInfo(
+    val name: String, val teacher: String, val classroom: String, val section: Int
+)
+
 data class CourseOfDay(
     val class1: List<CourseInfo>,
     val class2: List<CourseInfo>,
@@ -415,19 +419,20 @@ suspend fun handleMessageQuery(event: FriendMessageEvent, queryTime: Date) {
     try {
         while (userList.next()) {
             val sid: Int = userList.getInt("sid")
-            val coursePoint = statement2.executeQuery("SELECT courseData, updateTime FROM courses WHERE sid = $sid")
+            val coursePoint = statement2.executeQuery("SELECT courseData, updateTime, className FROM courses WHERE sid = $sid")
             if (coursePoint.next()) {
                 flagQuerySuccess = true
                 val courseData: String? = coursePoint.getString("courseData")
                 val updateTime: String? = coursePoint.getString("updateTime")
-                if ((courseData == null) || courseData.isEmpty() || (updateTime == null) || updateTime.isEmpty()) {
+                val className: String? = coursePoint.getString("className")
+                if ((courseData == null) || courseData.isEmpty() || (updateTime == null) || updateTime.isEmpty() || (className == null) || className.isEmpty()) {
                     event.user.sendMessage(
                         "查询课程表失败：$sid 的课程表还未抓取成功(可能是密码错误或教务系统关闭等原因)。\n\n可以使用如下指令修改密码:\n/bindkcb 学号 新密码"
                     )
                     continue
                 }
                 val courseOfWeek: CourseOfWeek = gson.fromJson(courseData, CourseOfWeek::class.java)
-                val todayCourse = getActualCourseOfDay(courseOfWeek, queryTime)
+                val todayCourse = getActualCourseOfDay(courseOfWeek, queryTime, className)
                 if (bindCount!! > 1) pushCourseToUser(QQ, todayCourse, updateTime, queryTime, "$sid 的查询结果：\n")
                 else pushCourseToUser(QQ, todayCourse, updateTime, queryTime, null)
             }
@@ -443,8 +448,9 @@ suspend fun handleMessageQuery(event: FriendMessageEvent, queryTime: Date) {
     else if (!flagQuerySuccess) event.user.sendMessage("查询课程表失败：当前所绑定账号课程表还未抓取成功(可能是密码错误或教务系统关闭等原因)。\n\n可以使用如下指令修改密码:\n/bindkcb 学号 新密码")
 }
 
-fun getActualCourseOfDay(courseOfWeek: CourseOfWeek, queryTime: Date): List<CourseInfo?> {
-    val res = mutableListOf<CourseInfo?>()
+fun getActualCourseOfDay(courseOfWeek: CourseOfWeek, queryTime: Date, className: String): Pair<List<CourseInfo?>, List<LabCourseInfo>> {
+    val commonCourse = mutableListOf<CourseInfo?>()
+
     val weekOfTeaching = getWeekOfTeaching(queryTime)
     val dayOfWeek = getDayOfWeek(queryTime)
     val courseOfDay: CourseOfDay = courseOfWeek[dayOfWeek]
@@ -453,19 +459,46 @@ fun getActualCourseOfDay(courseOfWeek: CourseOfWeek, queryTime: Date): List<Cour
         val courseOfSection = courseOfDay[cidx]
         for (course in courseOfSection) {
             if (course.week.contains(weekOfTeaching)) {
-                res.add(course)
+                commonCourse.add(course)
+//                CourseTimetable.logger.info {"c: name = ${course.name}, teacher = ${course.teacher}, classroom = ${course.place}, section = $cidx"}
                 flagFind = true
                 break
             }
         }
-        if (!flagFind) res.add(null)
+        if (!flagFind) commonCourse.add(null)
     }
-    return res
+
+    val labCourse = mutableListOf<LabCourseInfo>()
+
+    val semester = CourseTimetableConfig.semesterNow
+    val statement = CourseTimetableDBConn!!.createStatement()
+    try {
+//        CourseTimetable.logger.info {"SELECT name, teacher, classroom, section FROM labs WHERE semester = '$semester' and week = $weekOfTeaching and dayOfWeek = $dayOfWeek and className = '$className';"}
+        val labCourseList = statement.executeQuery("SELECT name, teacher, classroom, section FROM labs WHERE semester = '$semester' and week = $weekOfTeaching and dayOfWeek = $dayOfWeek and className = '$className';")
+        while (labCourseList.next()) {
+            val name: String = labCourseList.getString("name")!!
+            val teacher: String = labCourseList.getString("teacher")!!
+            val classroom: String = labCourseList.getString("classroom")!!
+            val section: Int = labCourseList.getInt("section")
+//            CourseTimetable.logger.info {"l: name = $name, teacher = $teacher, classroom = $classroom, section = $section"}
+            labCourse.add(LabCourseInfo(name, teacher, classroom, section))
+        }
+    } catch (e: Exception) {
+        CourseTimetable.logger.error(e)
+    } finally {
+        statement.close()
+    }
+    labCourse.sortBy { it.section }
+
+    return Pair(commonCourse, labCourse)
 }
 
 suspend fun pushCourseToUser(
-    QQ: Long, courses: List<CourseInfo?>, updateTime: String, queryTime: Date?, headString: String?
+    QQ: Long, courses: Pair<List<CourseInfo?>, List<LabCourseInfo>>, updateTime: String, queryTime: Date?, headString: String?
 ) {
+    val commonCourse = courses.first
+    val labCourse = courses.second
+    var labCourseIdx = 0
     val friend = BotActive!!.getFriend(QQ) ?: return
     val int2chn = mapOf(
         1 to "一", 2 to "二", 3 to "三", 4 to "四", 5 to "五", 6 to "六", 7 to "日"
@@ -485,16 +518,29 @@ suspend fun pushCourseToUser(
     res.append(WeatherHelper.getWeatherStr(myQueryTime))
     res.append("(课表更新于$updateTime)")
     for (i in 1..5) {
-        val course = courses[i - 1]
+        val course = commonCourse[i - 1]
         res.append("\n\n")
         res.append(int2circle[i])
         res.append(" ")
-        if (course == null) {
-            res.append("空")
-        } else {
+        if (course != null) {
             res.append(course.name).append("(").append(course.teacher).append(")\n　 ").append(course.place)
         }
+        if (labCourseIdx < labCourse.size && labCourse[labCourseIdx].section == i) {
+            var flagNeedSpace = (course != null)
+            do {
+                if (flagNeedSpace) res.append("\n\n　 ")
+                val lab = labCourse[labCourseIdx]
+                res.append("实验：").append(lab.name).append("(").append(lab.teacher).append(")\n　 ").append(lab.classroom)
+                labCourseIdx++
+                flagNeedSpace = true
+            } while (labCourseIdx < labCourse.size && labCourse[labCourseIdx].section == i)
+        } else if (course == null) {
+            res.append("空")
+        }
     }
+
+    if (labCourse.isNotEmpty())
+        res.append("\n\n(实验课表仅供参考，请注意关注调课信息)")
 
     friend.sendMessage(res.toString())
 }
@@ -519,20 +565,25 @@ suspend fun pushCourse() {
         if (coursePoint.next()) {
             val courseData: String? = coursePoint.getString("courseData")
             val updateTime: String? = coursePoint.getString("updateTime")
-            if (courseData == null || courseData.isEmpty() || updateTime == null || updateTime.isEmpty()) {
+            val className: String? = coursePoint.getString("className")
+            if (courseData == null || courseData.isEmpty() || updateTime == null || updateTime.isEmpty() || className == null || className.isEmpty()) {
                 BotActive!!.getFriend(QQ)
                     ?.sendMessage("查询课程表失败：$sid 的课程表还未抓取成功(可能是密码错误或教务系统关闭等原因)，请使用如下指令进行修改密码 /bindkcb $sid 教务系统登录密码")
                 continue
             }
             val courseOfWeek: CourseOfWeek = gson.fromJson(courseData, CourseOfWeek::class.java)
-            val todayCourse = getActualCourseOfDay(courseOfWeek, Date())
+            val todayCourse = getActualCourseOfDay(courseOfWeek, Date(), className)
             if ((!userList.getBoolean("pushOnWeekend")) && (dayOfWeek == 6 || dayOfWeek == 7)) {
                 var flagPush = false
-                for (course in todayCourse) {
-                    if (course != null) {
-                        flagPush = true
-                        break
+                if (todayCourse.second.isEmpty()) {
+                    for (course in todayCourse.first) {
+                        if (course != null) {
+                            flagPush = true
+                            break
+                        }
                     }
+                } else {
+                    flagPush = true
                 }
                 if (!flagPush) continue
             }
@@ -722,6 +773,7 @@ object CourseTimetableConfig : AutoSavePluginConfig("CourseTimetable") {
     val WebSocketPort by value<Int>(52225)
     val DatabasePos by value<String>("../ClassSchedule.db")
     val WetherApiParameter by value<String>("location=125.28,43.85&key=your_api_key")
+    val semesterNow by value<String>("2021-2022-2")
 }
 
 object WeatherHelper {

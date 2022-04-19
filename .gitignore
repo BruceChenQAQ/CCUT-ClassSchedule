@@ -157,3 +157,5 @@ cython_debug/
 /CaptchaImgs/tmp.jpg
 /setting.py
 /ClassSchedule_debug.db
+/labCourseCrawl/docFiles/*
+/labCourseCrawl/docxFiles/*
